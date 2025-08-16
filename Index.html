@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iris</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        :root {
+            --bg-color: #000000; --surface-color: #1A1A1A; --text-color: #E0E0E0; --text-secondary-color: #8A8A8A;
+            --border-color: #2A2A2A; --primary-color: #3B82F6; --primary-hover-color: #60A5FA; --primary-disabled-color: #1E3A8A;
+            --danger-color: #EF4444;
+            --logo-color: #89CFF0; /* Baby Blue for Logo */
+        }
+        html, body { height: 100%; margin: 0; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        .app-container {
+            width: 100%; height: 100%;
+            background-color: var(--bg-color);
+            display: flex; flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        /* --- WELCOME & TRANSITION STYLES --- */
+        .welcome-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--bg-color);
+            z-index: 1000; display: none; flex-direction: column; align-items: center; justify-content: center;
+            padding: 40px; text-align: center; transition: opacity 0.5s ease-out;
+        }
+        .welcome-content h1 { font-size: 2.5rem; margin-bottom: 12px; }
+        .welcome-content > p { font-size: 1.1rem; color: var(--text-secondary-color); margin-bottom: 40px; }
+        #get-started-btn { width: 100%; max-width: 300px; padding: 16px; font-size: 1.1rem; font-weight: 600; color: #fff; background: var(--primary-color); border: none; border-radius: 16px; cursor: pointer; }
+
+        .transition-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #000;
+            z-index: 999;
+            clip-path: circle(0% at var(--x, 50%) var(--y, 50%));
+            transition: clip-path 0.7s cubic-bezier(0.65, 0, 0.35, 1);
+        }
+        .transition-overlay.active { clip-path: circle(150% at var(--x, 50%) var(--y, 50%)); }
+
+        header, .viewer-header {
+            display: flex; justify-content: space-between; align-items: center; padding: 16px 24px;
+            flex-shrink: 0; border-bottom: 1px solid var(--border-color);
+        }
+        .header-actions { display: flex; align-items: center; gap: 8px; }
+        .logo { font-size: 1.4rem; font-weight: 700; }
+        .logo a { color: var(--logo-color); text-decoration: none; transition: color 0.2s; }
+        .logo a:hover { color: white; }
+        .header-action-btn { background: none; border: 1px solid var(--border-color); color: var(--text-secondary-color); border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+        .icon-btn { padding: 8px; width: 34px; height: 34px; justify-content: center; }
+        .icon-btn svg { width: 18px; height: 18px; stroke: currentColor; }
+        
+        main { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; }
+        .view { display: none; height: 100%; flex-direction: column; }
+        .view.active { display: flex; animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        #generator-view { justify-content: space-between; }
+        .result-wrapper { flex-grow: 1; overflow-y: auto; padding: 24px; display: flex; align-items: center; justify-content: center; }
+        .prompt-area { flex-shrink: 0; padding: 12px 24px 24px; border-top: 1px solid var(--border-color); background-color: var(--bg-color); }
+        
+        .prompt-input-container {
+            position: relative; display: flex; align-items: center; background-color: var(--surface-color);
+            border: 1px solid var(--border-color); border-radius: 50px;
+            transition: border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        .prompt-input-container.is-focused {
+            border-radius: 24px; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4);
+        }
+        textarea#prompt-input {
+            width: 100%; min-height: 48px; max-height: 200px; background: transparent; border: none; outline: none;
+            padding: 14px 60px 14px 50px; font-size: 1rem; color: var(--text-color);
+            box-sizing: border-box; resize: none; overflow-y: auto; line-height: 1.4;
+        }
+        #aspect-ratio-btn {
+            position: absolute; left: 8px; bottom: 8px; width: 36px; height: 36px; background: transparent; border: none; border-radius: 50%;
+            color: var(--text-secondary-color); display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: color 0.2s, background-color 0.2s;
+        }
+        #aspect-ratio-btn:hover { background-color: rgba(255,255,255,0.1); color: var(--text-color); }
+        #aspect-ratio-btn svg { width: 20px; height: 20px; stroke: currentColor; }
+        
+        #send-btn {
+            position: absolute; right: 8px; bottom: 8px; width: 36px; height: 36px; border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.2); cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: background-color 0.2s, opacity 0.2s, border-color 0.2s;
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+        }
+        #send-btn:hover { background: rgba(255, 255, 255, 0.2); }
+        #send-btn:disabled { cursor: not-allowed; opacity: 0.8; }
+        #send-btn .send-icon { display: block; width: 18px; height: 18px; fill: var(--text-color); transition: transform 0.2s, opacity 0.2s; }
+        #send-btn .loading-icon { display: none; width: 20px; height: 20px; }
+        #send-btn.is-loading { background-color: var(--primary-color); border-color: var(--primary-color); backdrop-filter: none; -webkit-backdrop-filter: none; }
+        #send-btn.is-loading .send-icon { transform: scale(0.5); opacity: 0; }
+        #send-btn.is-loading .loading-icon { display: flex; }
+
+        .loading-icon .wave-bar { background-color: white; width: 3px; height: 100%; border-radius: 3px; animation: wave-dance 1.2s ease-in-out infinite; }
+        .loading-icon .wave-bar:nth-child(2) { animation-delay: 0.2s; }
+        .loading-icon .wave-bar:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes wave-dance { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+
+        .multi-result-grid { display: grid; gap: 16px; width: 100%; margin: auto; transition: all 0.3s ease; }
+        .result-container { background-color: var(--surface-color); border-radius: 12px; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; }
+        .result-image { max-width: 100%; max-height: 100%; object-fit: contain; display: none; cursor: pointer; }
+
+        .multi-result-grid.layout-square { grid-template-columns: 1fr 1fr; max-width: 800px; }
+        .multi-result-grid.layout-square .result-container { aspect-ratio: 1/1; display: flex; }
+
+        .multi-result-grid.layout-landscape { grid-template-columns: 1fr; max-width: 700px; }
+        .multi-result-grid.layout-landscape .result-container { aspect-ratio: 16/9; }
+        .multi-result-grid.layout-landscape .result-container:nth-child(n+2) { display: none; }
+
+        .multi-result-grid.layout-portrait { grid-template-columns: 1fr 1fr; max-width: 550px; }
+        .multi-result-grid.layout-portrait .result-container { aspect-ratio: 3/4; }
+        .multi-result-grid.layout-portrait .result-container:nth-child(n+3) { display: none; }
+        
+        #translation-status {
+            font-size: 0.75rem;
+            color: var(--text-secondary-color);
+            text-align: center;
+            height: 1rem;
+            margin: 8px 0 0 0;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .history-wrapper { padding: 20px 24px; overflow-y: auto; height: 100%; }
+        .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .history-header h2 { margin: 0; flex-grow: 1; text-align: center; }
+        #history-back-btn { border: none; background: transparent; transition: background-color 0.2s; color: var(--text-color); }
+        #history-back-btn:hover { background-color: rgba(255,255,255,0.1); }
+        #select-history-btn { background: none; border: none; color: var(--text-color); padding: 6px 12px; }
+        .history-actions button#delete-selected-btn { border-color: var(--danger-color); color: var(--danger-color); display: none; margin-right: 8px; border-radius: 8px; padding: 6px 12px;}
+        .history-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .history-item { aspect-ratio: 1/1; background-size: cover; background-position: center; border-radius: 12px; cursor: pointer; position: relative; border: 2px solid transparent; overflow: hidden; }
+        .history-item-overlay { position: absolute; bottom: 0; left: 0; right: 0; padding: 16px 8px 6px; background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); text-align: right; }
+        .history-item-date { font-size: 0.75rem; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); }
+        .selection-mode .history-item { border-color: var(--surface-color); }
+        .history-item.selected { border-color: var(--primary-color); }
+        .selection-tick { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; background-color: rgba(0,0,0,0.5); border: 2px solid #fff; border-radius: 50%; display: none; align-items: center; justify-content: center; z-index: 2; }
+        .selection-mode .selection-tick { display: flex; }
+        .history-item.selected .selection-tick { background-color: var(--primary-color); }
+        .selection-tick::after { content: '✓'; color: #fff; font-size: 14px; display: none; }
+        .history-item.selected .selection-tick::after { display: block; }
+        
+        .viewer-header { padding: 14px 24px; }
+        .back-btn { background: none; border: none; color: var(--text-color); cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 1rem; padding: 8px; margin-left: -8px; }
+        .viewer-content { flex-grow: 1; padding: 0 24px 24px; display: flex; flex-direction: column; gap: 16px; }
+        .viewer-image-container { flex-grow: 1; display: flex; align-items: center; justify-content: center; background-color: var(--surface-color); border-radius: 16px; overflow: hidden; }
+        #viewer-image { max-width: 100%; max-height: 100%; object-fit: contain; }
+        #viewer-prompt { font-size: 0.9rem; color: var(--text-secondary-color); line-height: 1.5; background-color: var(--surface-color); padding: 12px; border-radius: 12px; margin: 0; }
+        
+        .drawer-backdrop, .modal-backdrop { background-color: rgba(0,0,0,0.6); position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; opacity: 0; visibility: hidden; }
+        .drawer { position: fixed; bottom: 0; left: 0; right: 0; background-color: var(--surface-color); border-top-left-radius: 20px; border-top-right-radius: 20px; padding: 24px; z-index: 101; transform: translateY(100%); transition: transform 0.3s ease; }
+        .modal { background-color: var(--surface-color); border-radius: 16px; padding: 24px; text-align: center; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.95); z-index: 201; width: 80%; max-width: 300px; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, transform 0.3s ease; }
+        .drawer.active, .modal.active, .drawer-backdrop.active, .modal-backdrop.active { opacity: 1; visibility: visible; }
+        .modal.active { transform: translate(-50%, -50%) scale(1); }
+        .drawer.active { transform: translateY(0); }
+        .chip-group { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+        .chip { background: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-secondary-color); padding: 8px 18px; border-radius: 99px; cursor: pointer; font-weight: 500; font-size: 0.9rem; }
+        .chip.active { background: var(--primary-color); color: #fff; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+        .modal-btn { flex: 1; padding: 10px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; color: #fff; }
+        .modal-btn.primary { background-color: var(--primary-color); } .modal-btn.danger { background-color: var(--danger-color); } .modal-btn.secondary { background-color: var(--border-color); }
+
+        @media (min-width: 768px) {
+            body { background: #181818; padding: 2rem; display: flex; justify-content: center; align-items: stretch; min-height: 100vh; box-sizing: border-box; }
+            .app-container { max-width: 1200px; width: 100%; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.4); border: 1px solid var(--border-color); }
+            .multi-result-grid.layout-square { grid-template-columns: repeat(4, 1fr); }
+            .multi-result-grid.layout-portrait { max-width: 650px; }
+            .history-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+            .history-wrapper, .viewer-content { max-width: 1200px; margin: 0 auto; padding: 24px 40px; }
+            .viewer-content { flex-direction: row; align-items: flex-start; }
+            #viewer-prompt { max-width: 300px; flex-shrink: 0; }
+            .prompt-area { padding: 12px 40px 24px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div id="welcome-screen" class="welcome-overlay">
+            <div class="welcome-content">
+                <h1>Welcome to Iris</h1>
+                <p>Your personal AI image creation studio.</p>
+                <button id="get-started-btn">Get Started</button>
+            </div>
+        </div>
+        
+        <div id="transition-overlay" class="transition-overlay"></div>
+        
+        <header id="main-header">
+            <div class="logo"><a href=""><span>Iris</span></a></div>
+            <div class="header-actions">
+                <button class="header-action-btn icon-btn" id="history-btn" title="View History">
+                    <svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </button>
+            </div>
+        </header>
+
+        <main>
+            <div id="generator-view" class="view active">
+                <div class="result-wrapper">
+                    <div class="multi-result-grid" id="multi-result-grid">
+                        <div class="result-container" data-model-id="sd3-1"><img class="result-image" alt="Stable Diffusion 3.5 Result 1"></div>
+                        <div class="result-container" data-model-id="sd3-2"><img class="result-image" alt="Stable Diffusion 3.5 Result 2"></div>
+                        <div class="result-container" data-model-id="mj-1"><img class="result-image" alt="Midjourney v6 Result 1"></div>
+                        <div class="result-container" data-model-id="mj-2"><img class="result-image" alt="Midjourney v6 Result 2"></div>
+                    </div>
+                </div>
+                <div class="prompt-area">
+                    <div class="prompt-input-container" id="prompt-container">
+                        <button id="aspect-ratio-btn" title="Aspect Ratio">
+                             <svg fill="none" stroke-width="2" viewBox="0 0 24 24"><path d="M10 4H4v6M14 4h6v6M10 20H4v-6M14 20h6v-6"></path></svg>
+                        </button>
+                        <textarea id="prompt-input" placeholder="Text to image..." rows="1"></textarea>
+                        <button id="send-btn" title="Generate Image">
+                            <svg class="send-icon" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
+                            <div class="loading-icon" style="display: flex; gap: 2px; align-items: center;">
+                                <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                            </div>
+                        </button>
+                    </div>
+                    <p id="translation-status"></p>
+                </div>
+            </div>
+
+            <div id="history-view" class="view">
+                <div class="history-wrapper">
+                    <div class="history-header">
+                        <button class="icon-btn" id="history-back-btn" title="Back to Generator">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                        </button>
+                        <h2>History</h2>
+                        <div class="history-actions">
+                            <button id="delete-selected-btn">Delete</button>
+                            <button id="select-history-btn">Select</button>
+                        </div>
+                    </div>
+                    <div class="history-grid" id="history-grid"></div>
+                </div>
+            </div>
+            <div id="history-viewer-view" class="view"><div class="viewer-header"><button class="back-btn" id="viewer-back-btn"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>Back</button></div><div class="viewer-content"><div class="viewer-image-container"><img id="viewer-image" alt="History item"></div><p id="viewer-prompt"></p></div></div>
+        </main>
+    </div>
+
+    <div class="drawer-backdrop" id="drawer-backdrop"></div>
+    <div class="drawer" id="aspect-ratio-drawer">
+        <h3>Select Aspect Ratio</h3>
+        <div class="chip-group" id="aspect-ratio-selector">
+            <button class="chip active" data-ratio="1024x1024">Square</button>
+            <button class="chip" data-ratio="768x1024">Portrait</button>
+            <button class="chip" data-ratio="1024x768">Landscape</button>
+        </div>
+    </div>
+    <div class="modal-backdrop" id="modal-backdrop"></div>
+    <div class="modal" id="modern-modal"><h3>Title</h3><p>Message</p><div class="modal-actions"></div></div>
+    
+    <script>
+        // DOM Elements
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const getStartedBtn = document.getElementById('get-started-btn');
+        const transitionOverlay = document.getElementById('transition-overlay');
+        const promptInput = document.getElementById('prompt-input');
+        const promptContainer = document.getElementById('prompt-container');
+        const sendBtn = document.getElementById('send-btn');
+        const aspectRatioBtn = document.getElementById('aspect-ratio-btn');
+        const aspectRatioDrawer = document.getElementById('aspect-ratio-drawer');
+        const drawerBackdrop = document.getElementById('drawer-backdrop');
+        const modalBackdrop = document.getElementById('modal-backdrop');
+        const aspectRatioSelector = document.getElementById('aspect-ratio-selector');
+        const translationStatus = document.getElementById('translation-status');
+        
+        const multiResultGrid = document.getElementById('multi-result-grid');
+        const views = document.querySelectorAll('.view');
+        const historyBtn = document.getElementById('history-btn');
+        const historyBackBtn = document.getElementById('history-back-btn');
+        const mainHeader = document.getElementById('main-header');
+        
+        const historyGrid = document.getElementById('history-grid');
+        const viewerImage = document.getElementById('viewer-image');
+        const viewerPrompt = document.getElementById('viewer-prompt');
+        const viewerBackBtn = document.getElementById('viewer-back-btn');
+        const selectHistoryBtn = document.getElementById('select-history-btn');
+        const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+        const modal = document.getElementById('modern-modal');
+
+        // State & Constants
+        const MEMORY_KEY = 'irisHistory';
+        const WELCOME_KEY = 'irisWelcomeSeen';
+        const MODELS = [
+            { id: 'stable-diffusion-3.5', uniqueId: 'sd3-1' }, 
+            { id: 'stable-diffusion-3.5', uniqueId: 'sd3-2' }, 
+            { id: 'midjourney', uniqueId: 'mj-1' }, 
+            { id: 'midjourney', uniqueId: 'mj-2' }
+        ];
+        let isSelectionMode = false;
+        let selectedItems = new Set();
+        let pendingGenerations = 0;
+        let lastGeneratorView = 'generator-view';
+        
+        const showModal = (title, message, buttons) => { modal.querySelector('h3').textContent = title; modal.querySelector('p').textContent = message; const actions = modal.querySelector('.modal-actions'); actions.innerHTML = ''; buttons.forEach(b => { const btn = document.createElement('button'); btn.textContent = b.text; btn.className = `modal-btn ${b.class}`; btn.onclick = () => { b.action(); hideModal(); }; actions.appendChild(btn); }); modal.classList.add('active'); modalBackdrop.classList.add('active'); };
+        const hideModal = () => { modal.classList.remove('active'); modalBackdrop.classList.remove('active'); };
+        const openDrawer = () => { aspectRatioDrawer.classList.add('active'); drawerBackdrop.classList.add('active'); };
+        const closeDrawer = () => { aspectRatioDrawer.classList.remove('active'); drawerBackdrop.classList.remove('active'); };
+
+        async function translateText(textToTranslate) {
+            if (!textToTranslate) return "";
+            const englishChars = textToTranslate.match(/[a-zA-Z]/g) || [];
+            if (englishChars.length / textToTranslate.length > 0.8) {
+                return textToTranslate;
+            }
+
+            translationStatus.textContent = 'Translating...';
+            translationStatus.style.opacity = 1;
+
+            try {
+                const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(textToTranslate)}`;
+                const response = await fetch(url);
+                if (!response.ok) return textToTranslate;
+
+                const data = await response.json();
+                const translatedText = data[0][0][0];
+
+                if (translatedText && translatedText.toLowerCase() !== textToTranslate.toLowerCase()) {
+                    translationStatus.textContent = `Translated to: "${translatedText}"`;
+                } else {
+                    translationStatus.style.opacity = 0;
+                }
+                return translatedText;
+            } catch (error) {
+                console.error("Translation failed:", error);
+                translationStatus.style.opacity = 0;
+                return textToTranslate;
+            }
+        }
+
+        const handleGenerate = async () => {
+            const userPrompt = promptInput.value.trim();
+            if (!userPrompt || sendBtn.disabled) {
+                if (!userPrompt) showModal('Missing Prompt', 'Please enter a prompt.', [{ text: 'OK', class: 'primary', action: () => {} }]);
+                return;
+            }
+            sendBtn.disabled = true;
+            sendBtn.classList.add('is-loading');
+
+            const translatedPrompt = await translateText(userPrompt);
+            
+            pendingGenerations = MODELS.length;
+            const activeRatioEl = aspectRatioSelector.querySelector('.chip.active');
+            const [width, height] = activeRatioEl.dataset.ratio.split('x');
+            
+            MODELS.forEach(model => generateSingleImage(userPrompt, translatedPrompt, model, width, height));
+        };
+
+        const generateSingleImage = (originalPrompt, translatedPrompt, model, width, height) => {
+            const container = document.querySelector(`.result-container[data-model-id='${model.uniqueId}']`);
+            container.innerHTML = '';
+            
+            let qualitySuffix = ', masterpiece, best quality, highly detailed, intricate, sharp focus, cinematic lighting, soft light, beautiful color grading, trending on Artstation, 8k, uhd';
+            
+            if (model.id === 'midjourney') {
+                qualitySuffix += ' --v 6';
+            }
+
+            const finalPrompt = translatedPrompt + qualitySuffix;
+            const randomSeed = Math.floor(Math.random() * 1000000);
+            const encodedPrompt = encodeURIComponent(finalPrompt);
+            const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&model=${model.id}&seed=${randomSeed}&nologo=true`;
+            
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.src = imageUrl;
+            img.className = 'result-image';
+            
+            img.onload = () => showResult(img, { prompt: originalPrompt }, container);
+            img.onerror = () => showError(container);
+        };
+
+        const checkGenerationsComplete = () => {
+            pendingGenerations--;
+            if (pendingGenerations <= 0) {
+                sendBtn.disabled = false;
+                sendBtn.classList.remove('is-loading');
+                setTimeout(() => { translationStatus.style.opacity = 0; }, 3000);
+            }
+        };
+        const showResult = (imgElement, generationData, container) => {
+            container.innerHTML = '';
+            container.appendChild(imgElement);
+            imgElement.style.display = 'block';
+            imgElement.onclick = () => { 
+                saveToHistory(generationData.prompt, imgElement.src); 
+                lastGeneratorView = 'generator-view';
+                viewHistoryItem({ prompt: generationData.prompt, src: imgElement.src, id: Date.now() }); 
+            };
+            checkGenerationsComplete();
+        };
+        const showError = (container) => {
+             container.innerHTML = '<p style="color: var(--text-secondary-color); font-size: 0.8rem; text-align: center;">Error loading image</p>';
+             checkGenerationsComplete();
+        };
+        const saveToHistory = (prompt, src) => { let history = JSON.parse(localStorage.getItem(MEMORY_KEY)) || []; history.unshift({ prompt, src, id: Date.now() }); history = history.slice(0, 50); localStorage.setItem(MEMORY_KEY, JSON.stringify(history)); };
+        
+        const renderHistory = () => {
+            const history = JSON.parse(localStorage.getItem(MEMORY_KEY)) || [];
+            historyGrid.innerHTML = '';
+            if (history.length === 0) { historyGrid.innerHTML = `<p style="color: var(--text-secondary-color); grid-column: 1 / -1; text-align: center;">No history yet.</p>`; return; }
+            history.forEach((item) => {
+                const historyItem = document.createElement('div');
+                historyItem.className = 'history-item';
+                historyItem.style.backgroundImage = `url(${item.src})`;
+                historyItem.dataset.id = item.id;
+                
+                const date = new Date(item.id);
+                const formattedDate = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+                historyItem.innerHTML = `
+                    <div class="selection-tick"></div>
+                    <div class="history-item-overlay">
+                        <span class="history-item-date">${formattedDate}</span>
+                    </div>
+                `;
+                historyItem.addEventListener('click', () => handleHistoryItemClick(item));
+                historyGrid.appendChild(historyItem);
+            });
+        };
+        const handleHistoryItemClick = (item) => {
+            if (isSelectionMode) { 
+                const itemElement = historyGrid.querySelector(`[data-id='${item.id}']`); 
+                const itemIdAsNumber = Number(item.id); 
+                if (selectedItems.has(itemIdAsNumber)) { 
+                    selectedItems.delete(itemIdAsNumber); 
+                    itemElement.classList.remove('selected'); 
+                } else { 
+                    selectedItems.add(itemIdAsNumber); 
+                    itemElement.classList.add('selected'); 
+                } 
+                updateDeleteButtonState(); 
+            } else { 
+                lastGeneratorView = 'history-view';
+                viewHistoryItem(item); 
+            }
+        };
+        const viewHistoryItem = (item) => { viewerImage.src = item.src; viewerPrompt.textContent = item.prompt; switchView('history-viewer-view'); };
+        
+        const toggleSelectionMode = () => {
+            isSelectionMode = !isSelectionMode;
+            document.querySelector('.history-wrapper').classList.toggle('selection-mode', isSelectionMode);
+            if (isSelectionMode) { selectHistoryBtn.textContent = 'Cancel'; deleteSelectedBtn.style.display = 'inline-block'; } 
+            else { selectHistoryBtn.textContent = 'Select'; deleteSelectedBtn.style.display = 'none'; selectedItems.clear(); document.querySelectorAll('.history-item.selected').forEach(el => el.classList.remove('selected')); }
+            updateDeleteButtonState();
+        };
+
+        const updateDeleteButtonState = () => { if (selectedItems.size > 0) { deleteSelectedBtn.textContent = `Delete (${selectedItems.size})`; } else { deleteSelectedBtn.textContent = 'Delete'; } };
+        const deleteSelectedHistoryItems = () => {
+            if (selectedItems.size === 0) return;
+            showModal(`Delete ${selectedItems.size} Item(s)?`, 'This action cannot be undone.', [
+                { text: 'Cancel', class: 'secondary', action: () => {} },
+                { text: 'Delete', class: 'danger', action: () => { let history = JSON.parse(localStorage.getItem(MEMORY_KEY)) || []; const newHistory = history.filter(item => !selectedItems.has(Number(item.id))); localStorage.setItem(MEMORY_KEY, JSON.stringify(newHistory)); toggleSelectionMode(); renderHistory(); }}
+            ]);
+        };
+
+        const switchView = (viewId) => {
+            const currentView = document.querySelector('.view.active');
+            if (currentView && currentView.id === viewId) return;
+
+            views.forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            mainHeader.style.display = viewId === 'history-viewer-view' ? 'none' : 'flex';
+            if (viewId === 'history-view') {
+                if (isSelectionMode) toggleSelectionMode();
+                renderHistory();
+            }
+        };
+
+        const initializeApp = () => {
+            if (localStorage.getItem(WELCOME_KEY)) {
+                welcomeScreen.style.display = 'none';
+                transitionOverlay.style.display = 'none';
+            } else {
+                welcomeScreen.style.display = 'flex';
+            }
+            multiResultGrid.classList.add('layout-square');
+            switchView('generator-view');
+        };
+
+        const autoGrowTextarea = (element) => {
+            element.style.height = 'auto';
+            element.style.height = (element.scrollHeight) + 'px';
+        };
+
+        // Event Listeners
+        getStartedBtn.addEventListener('click', (e) => {
+            const rect = e.target.getBoundingClientRect();
+            const x = rect.left + rect.width / 2;
+            const y = rect.top + rect.height / 2;
+            transitionOverlay.style.setProperty('--x', `${x}px`);
+            transitionOverlay.style.setProperty('--y', `${y}px`);
+            requestAnimationFrame(() => {
+                transitionOverlay.classList.add('active');
+                welcomeScreen.style.opacity = '0';
+            });
+            setTimeout(() => { welcomeScreen.style.display = 'none'; }, 700);
+            localStorage.setItem(WELCOME_KEY, 'true');
+        });
+
+        sendBtn.addEventListener('click', handleGenerate);
+        promptInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); }
+        });
+        promptInput.addEventListener('input', () => autoGrowTextarea(promptInput));
+        
+        promptInput.addEventListener('focus', () => promptContainer.classList.add('is-focused'));
+        promptInput.addEventListener('blur', () => promptContainer.classList.remove('is-focused'));
+
+        historyBtn.addEventListener('click', () => switchView('history-view'));
+        historyBackBtn.addEventListener('click', () => switchView('generator-view'));
+        aspectRatioBtn.addEventListener('click', openDrawer);
+        drawerBackdrop.addEventListener('click', closeDrawer);
+        viewerBackBtn.addEventListener('click', () => switchView(lastGeneratorView));
+        selectHistoryBtn.addEventListener('click', toggleSelectionMode);
+        deleteSelectedBtn.addEventListener('click', deleteSelectedHistoryItems);
+        
+        aspectRatioSelector.addEventListener('click', (e) => {
+            if (e.target.classList.contains('chip')) {
+                aspectRatioSelector.querySelector('.active').classList.remove('active');
+                e.target.classList.add('active');
+
+                const ratio = e.target.dataset.ratio;
+                multiResultGrid.classList.remove('layout-square', 'layout-landscape', 'layout-portrait');
+                
+                if (ratio === '1024x768') {
+                    multiResultGrid.classList.add('layout-landscape');
+                } else if (ratio === '768x1024') {
+                    multiResultGrid.classList.add('layout-portrait');
+                } else {
+                    multiResultGrid.classList.add('layout-square');
+                }
+                
+                closeDrawer();
+            }
+        });
+        
+        initializeApp();
+    </script>
+</body>
+</html>
