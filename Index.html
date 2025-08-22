@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IRIS</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        :root {
+            --bg-color: #FFFFFF; --surface-color: #F7F7F7; --text-color: #000000; --text-secondary-color: #555555;
+            --border-color: #000000; --shadow-color: #000000; --primary-color: #3B82F6; --primary-hover-color: #60A5FA; --primary-disabled-color: #1E3A8A;
+            --danger-color: #EF4444; --success-color: #22C55E;
+        }
+        
+        body.theme-dark {
+            --bg-color: #0A0A0A; --surface-color: #1A1A1A; --text-color: #FFFFFF; --text-secondary-color: #8A8A8A;
+            --border-color: #FFFFFF; --shadow-color: rgba(255, 255, 255, 0.5);
+        }
+        
+        html, body { height: 100%; margin: 0; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            background-image: linear-gradient(160deg, var(--bg-color) 70%, color-mix(in srgb, var(--bg-color) 90%, var(--text-secondary-color)));
+            color: var(--text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .app-container {
+            width: 100%; height: 100%;
+            background-color: var(--bg-color);
+            display: flex; flex-direction: column;
+            overflow: hidden; position: relative;
+            transition: background-color 0.3s ease;
+        }
+        
+        .welcome-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--bg-color);
+            z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 40px; text-align: center; transition: opacity 0.3s ease-out;
+        }
+        .welcome-content h1 { font-size: 2.5rem; margin-bottom: 12px; }
+        .welcome-content > p { font-size: 1.1rem; color: var(--text-secondary-color); margin-bottom: 40px; }
+        #get-started-btn { width: 100%; max-width: 300px; padding: 16px; font-size: 1.1rem; font-weight: 600; color: #fff; background: var(--primary-color); border: 2px solid var(--border-color); border-radius: 8px; cursor: pointer; box-shadow: 5px 5px 0px var(--shadow-color); transition: transform 0.1s ease, box-shadow 0.1s ease; }
+        #get-started-btn:active { transform: translate(5px, 5px); box-shadow: none; }
+
+        header, .viewer-header {
+            display: flex; justify-content: center; align-items: center; padding: 16px 24px;
+            flex-shrink: 0; border-bottom: 2px solid var(--border-color);
+        }
+        
+        .logo a { color: var(--text-color); text-decoration: none; display: inline-block; }
+        .logo-box {
+            font-size: 2.5rem; font-weight: 700; background-color: var(--surface-color);
+            padding: 12px 24px; border-radius: 12px; border: 2px solid var(--border-color);
+            box-shadow: 5px 5px 0px var(--shadow-color); transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+        .logo a:active .logo-box { transform: translate(5px, 5px); box-shadow: none; }
+
+        main { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; }
+        .view { display: none; height: 100%; flex-direction: column; position: relative; }
+        .view.active { display: flex; animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        #generator-view { justify-content: space-between; }
+        .result-wrapper { flex-grow: 1; overflow-y: auto; padding: 24px; display: flex; align-items: center; justify-content: center; }
+        .prompt-area { flex-shrink: 0; padding: 12px 24px 24px; border-top: 2px solid var(--border-color); background-color: var(--bg-color); }
+        
+        .prompt-input-container {
+            position: relative; display: flex; align-items: center; 
+            background-color: var(--surface-color);
+            border: 2px solid var(--border-color); border-radius: 12px;
+            box-shadow: 5px 5px 0px var(--shadow-color);
+            transition: box-shadow 0.1s ease;
+        }
+        .prompt-input-container.is-focused { box-shadow: 0 0 0 4px var(--primary-color); }
+        body.theme-dark .prompt-input-container.is-focused { box-shadow: 0 0 0 4px var(--primary-hover-color); }
+
+        .prompt-input-container.is-generating {
+            box-shadow: none;
+        }
+        .prompt-input-container.is-generating::before {
+            content: '';
+            position: absolute;
+            top: -3px; left: -3px; right: -3px; bottom: -3px;
+            background: linear-gradient(90deg, #ff00de, #de00ff, #7100ff, #0099ff, #00ff87, #48ff00, #ffb300, #ff0000, #ff00de);
+            background-size: 300% 100%;
+            border-radius: 14px;
+            z-index: -1;
+            animation: generating-glow 2s linear infinite;
+        }
+
+        @keyframes generating-glow {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+        }
+
+        textarea#prompt-input {
+            width: 100%; min-height: 48px; max-height: 200px; background: transparent; border: none; outline: none;
+            padding: 14px 50px 14px 95px; font-size: 1rem; color: var(--text-color);
+            box-sizing: border-box; resize: none; overflow-y: auto; line-height: 1.4;
+        }
+
+        .prompt-icon-btn {
+            position: absolute; bottom: 8px; width: 36px; height: 36px; background: transparent; border: none;
+            color: var(--text-secondary-color); display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: color 0.2s, background-color 0.2s; border-radius: 50%;
+        }
+        .prompt-icon-btn:hover { background-color: rgba(0,0,0,0.05); color: var(--text-color); }
+        body.theme-dark .prompt-icon-btn:hover { background-color: rgba(255,255,255,0.1); }
+        .prompt-icon-btn svg { width: 20px; height: 20px; stroke: currentColor; }
+        #history-btn { left: 8px; }
+        #prompt-theme-btn { left: 48px; }
+        #prompt-theme-btn svg { fill: currentColor; }
+        body.theme-dark .sun-icon { display: none; }
+        body:not(.theme-dark) .moon-icon { display: none; }
+        
+        #send-btn {
+            position: absolute; right: 8px; bottom: 8px; width: 36px; height: 36px; border-radius: 8px;
+            border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: background-color 0.2s, opacity 0.2s, transform 0.1s ease, box-shadow 0.1s ease;
+            background: #000000; box-shadow: 2px 2px 0px #555;
+        }
+        #send-btn:active { transform: translate(2px, 2px); box-shadow: none; }
+        body.theme-dark #send-btn { background: #FFFFFF; box-shadow: 2px 2px 0px #AAAAAA; }
+        #send-btn:disabled { cursor: not-allowed; opacity: 0.8; }
+        #send-btn .send-icon { display: block; width: 18px; height: 18px; fill: #FFFFFF; transition: transform 0.2s, opacity 0.2s; }
+        body.theme-dark #send-btn .send-icon { fill: #000000; }
+        
+        #send-btn.is-loading { background: #000000; box-shadow: none; transform: none; }
+        body.theme-dark #send-btn.is-loading { background: #FFFFFF; }
+        #send-btn.is-loading .send-icon { transform: scale(0.5); opacity: 0; }
+        #send-btn .loading-icon { display: none; width: 20px; height: 20px; }
+        #send-btn.is-loading .loading-icon { display: flex; }
+        .loading-icon .wave-bar { background-color: white; width: 3px; height: 100%; border-radius: 3px; animation: wave-dance 1.2s ease-in-out infinite; }
+        body.theme-dark .loading-icon .wave-bar { background-color: black; }
+        @keyframes wave-dance { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+
+        .multi-result-grid { display: grid; gap: 16px; width: 100%; margin: auto; grid-template-columns: 1fr 1fr; max-width: 800px; }
+        .multi-result-grid .result-container { aspect-ratio: 1/1; display: flex; }
+        .result-container { background-color: var(--surface-color); border-radius: 8px; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; border: 2px solid var(--border-color); }
+        .result-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: none;
+            cursor: pointer;
+        }
+        
+        #translation-status { font-size: 0.75rem; color: var(--text-secondary-color); text-align: center; height: 1rem; margin: 8px 0 0 0; opacity: 0; transition: opacity 0.3s ease; }
+        
+        .history-wrapper { padding: 20px 24px 120px; overflow-y: auto; height: 100%; box-sizing: border-box; }
+        .history-header { display: flex; justify-content: center; align-items: center; margin-bottom: 24px; }
+        .history-header h2 { font-size: 2.5rem; font-weight: 700; margin: 0; }
+        
+        .history-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .history-item {
+            aspect-ratio: 1/1;
+            border-radius: 8px;
+            cursor: pointer;
+            position: relative;
+            border: 2px solid var(--border-color);
+            overflow: hidden;
+            transition: opacity 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .history-item:hover { transform: translateY(-4px); box-shadow: 4px 8px 10px rgba(0,0,0,0.1); }
+        body.theme-dark .history-item:hover { box-shadow: 4px 8px 15px rgba(0,0,0,0.2); }
+
+        .history-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+        .history-item:hover img {
+            transform: scale(1.05);
+        }
+
+        .history-item-overlay { position: absolute; bottom: 0; left: 0; right: 0; padding: 16px 8px 6px; background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); text-align: right; }
+        .history-item-date { font-size: 0.75rem; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); }
+        
+        .floating-btn {
+            height: 56px; border-radius: 12px; background-color: var(--surface-color);
+            border: 2px solid var(--border-color); box-shadow: 5px 5px 0px var(--shadow-color);
+            transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.3s ease;
+            display: flex; align-items: center; justify-content: center; font-size: 1rem;
+            font-weight: 600; color: var(--text-color); cursor: pointer; gap: 8px;
+        }
+        .floating-btn:active { transform: translateY(4px) scale(0.98); box-shadow: none; }
+        .floating-btn svg { width: 20px; height: 20px; stroke: currentColor; }
+
+        #history-back-btn-container { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 20; }
+        #history-back-btn { width: 200px; }
+        
+        .viewer-action-bar {
+            flex-shrink: 0; display: flex; gap: 12px; padding: 12px 24px;
+            border-top: 2px solid var(--border-color); background-color: var(--bg-color);
+        }
+        .viewer-action-btn {
+            flex-grow: 1; padding: 12px; font-size: 1rem; font-weight: 600; border-radius: 8px;
+            border: 2px solid var(--border-color); cursor: pointer; box-shadow: 5px 5px 0px var(--shadow-color);
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .viewer-action-btn:active { transform: translate(5px, 5px); box-shadow: none; }
+        .viewer-action-btn.danger { background-color: var(--danger-color); color: white; border-color: var(--danger-color); }
+        body.theme-dark .viewer-action-btn.danger { border-color: var(--border-color); }
+        .viewer-action-btn.secondary { background-color: var(--surface-color); color: var(--text-color); }
+        .viewer-action-btn svg { width: 20px; height: 20px; stroke: currentColor; }
+        .viewer-action-btn.danger svg { stroke: white; }
+
+        .viewer-content {
+            flex-grow: 1;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+        }
+        .viewer-image-container { flex-grow: 1; display: flex; align-items: center; justify-content: center; background-color: var(--surface-color); border-radius: 8px; overflow: hidden; border: 2px solid var(--border-color); min-height: 200px;}
+        #viewer-image { max-width: 100%; max-height: 100%; object-fit: contain; }
+        #viewer-prompt { font-size: 0.9rem; color: var(--text-secondary-color); line-height: 1.5; background-color: var(--surface-color); padding: 12px; border-radius: 8px; margin: 0; border: 2px solid var(--border-color); }
+        
+        .modal-backdrop { background-color: rgba(0,0,0,0.6); position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; opacity: 0; visibility: hidden; transition: opacity 0.3s ease; }
+        .modal { background-color: var(--surface-color); border-radius: 8px; padding: 24px; text-align: center; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.95); z-index: 201; width: 80%; max-width: 300px; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, transform 0.3s ease; border: 2px solid var(--border-color); box-shadow: 6px 6px 0px var(--shadow-color); }
+        .modal.active, .modal-backdrop.active { opacity: 1; visibility: visible; }
+        .modal.active { transform: translate(-50%, -50%) scale(1); }
+        .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+        .modal-btn { flex: 1; padding: 10px; border-radius: 8px; font-weight: 600; cursor: pointer; color: #fff; border: 2px solid var(--border-color); box-shadow: 4px 4px 0px var(--shadow-color); transition: transform 0.1s ease, box-shadow 0.1s ease; }
+        .modal-btn:active { transform: translate(4px, 4px); box-shadow: none; }
+        .modal-btn.primary { background-color: var(--primary-color); } .modal-btn.danger { background-color: var(--danger-color); } .modal-btn.secondary { background-color: var(--bg-color); color: var(--text-color); }
+
+        @media (min-width: 992px) {
+            body { background: var(--surface-color); padding: 2rem; display: flex; justify-content: center; align-items: center; min-height: 100vh; box-sizing: border-box; }
+            .app-container { max-width: 1400px; width: 100%; height: 85vh; min-height: 700px; border-radius: 12px; box-shadow: 8px 8px 0px var(--shadow-color); border: 2px solid var(--border-color); }
+            #generator-view { flex-direction: row; justify-content: flex-start; }
+            .result-wrapper { flex: 1; border-right: 2px solid var(--border-color); }
+            .prompt-area { width: 380px; flex-shrink: 0; border-top: none; padding: 24px; display: flex; flex-direction: column; justify-content: flex-end; }
+            #prompt-container { margin-top: auto; }
+            .multi-result-grid { grid-template-columns: repeat(2, 1fr); max-width: 90%; }
+            .history-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+            .history-wrapper { padding-bottom: 32px; }
+            .viewer-content { flex-direction: row; align-items: stretch; gap: 32px; padding: 32px 40px; }
+            .viewer-image-container { flex: 2; }
+            .viewer-prompt-container { flex: 1; background-color: transparent; padding: 0; max-width: 400px; display: flex; flex-direction: column; }
+            .viewer-prompt-container h4 { margin: 0 0 8px 0; color: var(--text-color); font-size: 1rem; font-weight: 600; }
+            #viewer-prompt { background-color: var(--surface-color); flex-grow: 1; margin: 0; }
+            .viewer-action-bar { padding: 24px 40px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div id="welcome-screen" class="welcome-overlay">
+            <div class="welcome-content">
+                <h1>Welcome to IRIS</h1>
+                <p>Your personal AI image creation studio.</p>
+                <button id="get-started-btn">Get Started</button>
+            </div>
+        </div>
+        
+        <header id="main-header">
+            <div class="logo">
+                <a href="#" id="logo-btn">
+                    <div class="logo-box">IRIS</div>
+                </a>
+            </div>
+        </header>
+
+        <main>
+            <div id="generator-view" class="view active">
+                <div class="result-wrapper">
+                    <div class="multi-result-grid" id="multi-result-grid">
+                        <div class="result-container" data-model-id="sd3-1"><img class="result-image" alt="Result 1"></div>
+                        <div class="result-container" data-model-id="sd3-2"><img class="result-image" alt="Result 2"></div>
+                        <div class="result-container" data-model-id="mj-1"><img class="result-image" alt="Result 3"></div>
+                        <div class="result-container" data-model-id="mj-2"><img class="result-image" alt="Result 4"></div>
+                    </div>
+                </div>
+                <div class="prompt-area">
+                    <div class="prompt-input-container" id="prompt-container">
+                        <button id="history-btn" class="prompt-icon-btn" title="View History">
+                            <svg fill="none" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </button>
+                        <button id="prompt-theme-btn" class="prompt-icon-btn" title="Toggle Theme">
+                            <svg class="sun-icon" fill="none" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                            <svg class="moon-icon" stroke="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"></path></svg>
+                        </button>
+                        <textarea id="prompt-input" placeholder="Text to image..." rows="1"></textarea>
+                        <button id="send-btn" title="Generate Image">
+                            <svg class="send-icon" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
+                            <div class="loading-icon" style="display: flex; gap: 2px; align-items: center;">
+                                <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                            </div>
+                        </button>
+                    </div>
+                    <p id="translation-status"></p>
+                </div>
+            </div>
+
+            <div id="history-view" class="view">
+                <div class="history-wrapper">
+                    <div class="history-header">
+                        <h2>History</h2>
+                    </div>
+                    <div class="history-grid" id="history-grid"></div>
+                </div>
+                <div id="history-back-btn-container">
+                    <button id="history-back-btn" class="floating-btn">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                        Back to Generator
+                    </button>
+                </div>
+            </div>
+            
+            <div id="history-viewer-view" class="view">
+                <div class="viewer-content">
+                    <div class="viewer-image-container"><img id="viewer-image" alt="History item"></div>
+                    <div class="viewer-prompt-container">
+                        <h4>Prompt</h4>
+                        <p id="viewer-prompt"></p>
+                    </div>
+                </div>
+                <div class="viewer-action-bar">
+                    <button id="viewer-back-btn" class="viewer-action-btn secondary">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                        Back
+                    </button>
+                    <button id="viewer-delete-btn" class="viewer-action-btn danger">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal-backdrop" id="modal-backdrop"></div>
+    <div class="modal" id="modern-modal"><h3>Title</h3><p>Message</p><div class="modal-actions"></div></div>
+    
+    <script>
+        // DOM Elements
+        const logoBtn = document.getElementById('logo-btn');
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const getStartedBtn = document.getElementById('get-started-btn');
+        const promptInput = document.getElementById('prompt-input');
+        const promptContainer = document.getElementById('prompt-container');
+        const sendBtn = document.getElementById('send-btn');
+        const promptThemeBtn = document.getElementById('prompt-theme-btn');
+        const modalBackdrop = document.getElementById('modal-backdrop');
+        const translationStatus = document.getElementById('translation-status');
+        const multiResultGrid = document.getElementById('multi-result-grid');
+        const views = document.querySelectorAll('.view');
+        const historyBtn = document.getElementById('history-btn');
+        const historyBackBtn = document.getElementById('history-back-btn');
+        const mainHeader = document.getElementById('main-header');
+        const historyGrid = document.getElementById('history-grid');
+        const viewerImage = document.getElementById('viewer-image');
+        const viewerPrompt = document.getElementById('viewer-prompt');
+        const viewerBackBtn = document.getElementById('viewer-back-btn');
+        const viewerDeleteBtn = document.getElementById('viewer-delete-btn');
+        const modal = document.getElementById('modern-modal');
+
+        // State & Constants
+        const MEMORY_KEY = 'irisHistory';
+        const WELCOME_KEY = 'irisWelcomeSeen';
+        const THEME_KEY = 'irisTheme';
+        const MODELS = [ { id: 'stable-diffusion-3.5', uniqueId: 'sd3-1' }, { id: 'stable-diffusion-3.5', uniqueId: 'sd3-2' }, { id: 'midjourney', uniqueId: 'mj-1' }, { id: 'midjourney', uniqueId: 'mj-2' } ];
+        let pendingGenerations = 0;
+        let lastGeneratorView = 'generator-view';
+        let currentlyViewedItemId = null;
+        
+        const showModal = (title, message, buttons) => { modal.querySelector('h3').textContent = title; modal.querySelector('p').textContent = message; const actions = modal.querySelector('.modal-actions'); actions.innerHTML = ''; buttons.forEach(b => { const btn = document.createElement('button'); btn.textContent = b.text; btn.className = `modal-btn ${b.class}`; btn.onclick = () => { b.action(); hideModal(); }; actions.appendChild(btn); }); modal.classList.add('active'); modalBackdrop.classList.add('active'); };
+        const hideModal = () => { modal.classList.remove('active'); modalBackdrop.classList.remove('active'); };
+
+        async function translateText(textToTranslate) {
+            if (!textToTranslate || (textToTranslate.match(/[a-zA-Z]/g) || []).length / textToTranslate.length > 0.8) return textToTranslate;
+            translationStatus.textContent = 'Translating...';
+            translationStatus.style.opacity = 1;
+            try {
+                const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(textToTranslate)}`;
+                const response = await fetch(url);
+                if (!response.ok) return textToTranslate;
+                const data = await response.json();
+                const translatedText = data[0][0][0];
+                translationStatus.textContent = (translatedText && translatedText.toLowerCase() !== textToTranslate.toLowerCase()) ? `Translated to: "${translatedText}"` : '';
+                return translatedText;
+            } catch (error) { console.error("Translation failed:", error); translationStatus.style.opacity = 0; return textToTranslate; }
+        }
+
+        const handleGenerate = async () => {
+            const userPrompt = promptInput.value.trim();
+            if (!userPrompt || sendBtn.disabled) {
+                if (!userPrompt) showModal('Missing Prompt', 'Please enter a prompt.', [{ text: 'OK', class: 'primary', action: () => {} }]);
+                return;
+            }
+            sendBtn.disabled = true;
+            sendBtn.classList.add('is-loading');
+            promptContainer.classList.add('is-generating');
+            const translatedPrompt = await translateText(userPrompt);
+            pendingGenerations = MODELS.length;
+            MODELS.forEach(model => generateSingleImage(userPrompt, translatedPrompt, model));
+        };
+
+        const generateSingleImage = (originalPrompt, translatedPrompt, model) => {
+            const container = document.querySelector(`.result-container[data-model-id='${model.uniqueId}']`);
+            container.innerHTML = '';
+            let qualitySuffix = ', masterpiece, best quality, highly detailed, intricate, sharp focus, cinematic lighting, soft light, beautiful color grading, trending on Artstation, 8k, uhd';
+            if (model.id === 'midjourney') qualitySuffix += ' --v 6';
+            const finalPrompt = translatedPrompt + qualitySuffix;
+            const randomSeed = Math.floor(Math.random() * 1000000);
+            const encodedPrompt = encodeURIComponent(finalPrompt);
+            const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&model=${model.id}&seed=${randomSeed}&nologo=true`;
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.src = imageUrl;
+            img.className = 'result-image';
+            img.onload = () => showResult(img, { prompt: originalPrompt }, container);
+            img.onerror = () => showError(container);
+        };
+
+        const checkGenerationsComplete = () => {
+            pendingGenerations--;
+            if (pendingGenerations <= 0) {
+                sendBtn.disabled = false;
+                sendBtn.classList.remove('is-loading');
+                promptContainer.classList.remove('is-generating');
+                setTimeout(() => { translationStatus.style.opacity = 0; }, 3000);
+            }
+        };
+        const showResult = (imgElement, generationData, container) => {
+            container.innerHTML = ''; container.appendChild(imgElement);
+            imgElement.style.display = 'block';
+            imgElement.onclick = () => {
+                lastGeneratorView = 'generator-view';
+                viewHistoryItem({ prompt: generationData.prompt, src: imgElement.src, id: Date.now() });
+            };
+            saveToHistory(generationData.prompt, imgElement.src);
+            checkGenerationsComplete();
+        };
+        const showError = (container) => {
+             container.innerHTML = '<p style="color: var(--text-secondary-color); font-size: 0.8rem; text-align: center;">Error loading image</p>';
+             checkGenerationsComplete();
+        };
+        const saveToHistory = (prompt, src) => { let history = JSON.parse(localStorage.getItem(MEMORY_KEY)) || []; history.unshift({ prompt, src, id: Date.now() }); history = history.slice(0, 50); localStorage.setItem(MEMORY_KEY, JSON.stringify(history)); };
+        
+        const renderHistory = () => {
+            const history = JSON.parse(localStorage.getItem(MEMORY_KEY)) || [];
+            historyGrid.innerHTML = history.length === 0 ? `<p style="color: var(--text-secondary-color); grid-column: 1 / -1; text-align: center;">No history yet.</p>` : '';
+            history.forEach((item) => {
+                const historyItem = document.createElement('div');
+                historyItem.className = 'history-item';
+                historyItem.dataset.id = item.id;
+
+                // Create and append the image element
+                const img = document.createElement('img');
+                img.src = item.src;
+                img.alt = item.prompt.substring(0, 30);
+                historyItem.appendChild(img);
+                
+                // Create and append the overlay
+                const overlay = document.createElement('div');
+                overlay.className = 'history-item-overlay';
+                const date = new Date(item.id);
+                const formattedDate = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                overlay.innerHTML = `<span class="history-item-date">${formattedDate}</span>`;
+                historyItem.appendChild(overlay);
+
+                historyItem.addEventListener('click', () => handleItemClick(item));
+
+                historyGrid.appendChild(historyItem);
+            });
+        };
+
+        const handleItemClick = (item) => {
+            lastGeneratorView = 'history-view';
+            viewHistoryItem(item);
+        };
+
+        const viewHistoryItem = (item) => {
+            viewerImage.src = item.src;
+            viewerPrompt.textContent = item.prompt;
+            currentlyViewedItemId = item.id;
+            switchView('history-viewer-view');
+        };
+
+        const handleDeleteSingleViewedItem = () => {
+            if (!currentlyViewedItemId) return;
+            showModal('Delete Image?', 'This action cannot be undone.', [
+                { text: 'Cancel', class: 'secondary', action: () => {} },
+                { text: 'Delete', class: 'danger', action: () => {
+                    let history = JSON.parse(localStorage.getItem(MEMORY_KEY)) || [];
+                    const newHistory = history.filter(item => item.id !== currentlyViewedItemId);
+                    localStorage.setItem(MEMORY_KEY, JSON.stringify(newHistory));
+                    switchView('history-view');
+                    currentlyViewedItemId = null;
+                }}
+            ]);
+        };
+
+        const switchView = (viewId) => {
+            views.forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            mainHeader.style.display = (viewId === 'history-viewer-view' || viewId === 'history-view') ? 'none' : 'flex';
+            
+            if (viewId === 'history-view') {
+                renderHistory();
+            }
+        };
+
+        const setTheme = (theme) => {
+            document.body.classList.toggle('theme-dark', theme === 'dark');
+            localStorage.setItem(THEME_KEY, theme);
+        };
+        
+        const initializeApp = () => {
+            if (!localStorage.getItem(WELCOME_KEY)) {
+                welcomeScreen.style.display = 'flex';
+            } else {
+                welcomeScreen.style.display = 'none';
+            }
+            switchView('generator-view');
+
+            const savedTheme = localStorage.getItem(THEME_KEY);
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            setTheme(savedTheme || (systemPrefersDark ? 'dark' : 'light'));
+        };
+
+        const autoGrowTextarea = (element) => { element.style.height = 'auto'; element.style.height = (element.scrollHeight) + 'px'; };
+
+        // Event Listeners
+        logoBtn.addEventListener('click', (e) => {
+            e.preventDefault(); switchView('generator-view'); promptInput.value = ''; autoGrowTextarea(promptInput);
+            document.querySelectorAll('.result-container').forEach(c => c.innerHTML = '');
+        });
+        
+        getStartedBtn.addEventListener('click', () => {
+            welcomeScreen.style.opacity = '0';
+            setTimeout(() => {
+                welcomeScreen.style.display = 'none';
+            }, 300); // Wait for fade out to complete
+            localStorage.setItem(WELCOME_KEY, 'true');
+        });
+
+        promptThemeBtn.addEventListener('click', () => {
+            const newTheme = document.body.classList.contains('theme-dark') ? 'light' : 'dark';
+            setTheme(newTheme);
+        });
+
+        sendBtn.addEventListener('click', handleGenerate);
+        promptInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); } });
+        promptInput.addEventListener('input', () => autoGrowTextarea(promptInput));
+        promptInput.addEventListener('focus', () => promptContainer.classList.add('is-focused'));
+        promptInput.addEventListener('blur', () => promptContainer.classList.remove('is-focused'));
+
+        historyBtn.addEventListener('click', () => switchView('history-view'));
+        historyBackBtn.addEventListener('click', () => switchView('generator-view'));
+        
+        viewerBackBtn.addEventListener('click', () => switchView(lastGeneratorView));
+        viewerDeleteBtn.addEventListener('click', handleDeleteSingleViewedItem);
+        
+        initializeApp();
+    </script>
+</body>
+</html>
